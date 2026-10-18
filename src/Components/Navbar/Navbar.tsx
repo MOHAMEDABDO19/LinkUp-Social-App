@@ -44,8 +44,10 @@ export default function Navbar({ isLoggedIn, collapsed }: Props) {
     };
   }, [menuOpen]);
 
+  // Ask before logging out
   function handleLogout() {
     setMenuOpen(false);
+    if (!window.confirm("Are you sure you want to log out?")) return;
     localStorage.removeItem("token");
     toast.success("Logged out successfully");
     navigate("/login");
@@ -87,8 +89,6 @@ export default function Navbar({ isLoggedIn, collapsed }: Props) {
 
           {isLoggedIn ? (
             <>
-            
-
               <NotificationBell />
 
               {/* Desktop: plain photo, opens my profile (no arrow) */}

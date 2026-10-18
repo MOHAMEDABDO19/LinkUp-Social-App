@@ -1,5 +1,20 @@
 import type { AppNotification } from "./Pages/Types/types";
 
+type Loose = Record<string, unknown>;
+
+const asObj = (v: unknown): Loose | null =>
+  v && typeof v === "object" ? (v as Loose) : null;
+
+// An id can come as a string or as an object with _id / id
+const idOf = (v: unknown): string | null => {
+  if (!v) return null;
+  if (typeof v === "string") return v;
+  const o = asObj(v);
+  if (!o) return null;
+  const id = o._id ?? o.id;
+  return typeof id === "string" ? id : null;
+};
+
 export function timeAgo(date?: string) {
   if (!date) return "Recently";
   const s = Math.max(1, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
@@ -28,12 +43,48 @@ export function describe(n: AppNotification): string {
 }
 
 // A deleted post comes back as { unavailable: true }
-export const unavailable = (n: AppNotification) => n.entity?.unavailable === true;
+export const unavailable = (n: AppNotification) =>
+  asObj((n as unknown as Loose).entity)?.unavailable === true;
+
+// Find the post id wherever the API put it
+function postIdOf(n: AppNotification): string | null {
+  const raw = n as unknown as Loose;
+  const kind = String(raw.entityType ?? "").toLowerCase();
+  const entity = asObj(raw.entity);
+
+  // The notification is about a post itself (like / share / mention)
+  if (kind === "post") return idOf(raw.entityId) ?? idOf(entity);
+
+  // The notification is about a comment or reply: the post is inside it
+  return (
+    idOf(entity?.post) ??
+    idOf(entity?.postId) ??
+    idOf(raw.post) ??
+    idOf(raw.postId) ??
+    null
+  );
+}
 
 // Where a click goes: the post, or the person's profile for follows
 export function linkFor(n: AppNotification): string | null {
-  if (n.entityType === "post" && n.entityId && !unavailable(n)) return `/posts/${n.entityId}`;
-  if (n.entityType === "user" && n.entityId) return `/profile/${n.entityId}`;
-  if (String(n.type).includes("follow") && n.actor?._id) return `/profile/${n.actor._id}`;
+  if (unavailable(n)) return null;
+
+  const raw = n as unknown as Loose;
+  const type = String(raw.type ?? "").toLowerCase();
+  const kind = String(raw.entityType ?? "").toLowerCase();
+
+  if (type.includes("follow")) {
+    const actorId = idOf(raw.actor);
+    return actorId ? `/profile/${actorId}` : null;
+  }
+
+  const postId = postIdOf(n);
+  if (postId) return `/posts/${postId}`;
+
+  if (kind === "user") {
+    const userId = idOf(raw.entityId);
+    if (userId) return `/profile/${userId}`;
+  }
+
   return null;
 }

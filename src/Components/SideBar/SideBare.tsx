@@ -41,7 +41,9 @@ export default function Sidebar({ isLoggedIn, collapsed, onToggleCollapse }: Sid
   const on = (to: string, isActive: boolean) =>
     to.includes("settings") ? isActive && onSettings : to === "/profile" ? isActive && !onSettings : isActive;
 
+  // Ask before logging out (desktop button and mobile tab both use this)
   function handleLogout() {
+    if (!window.confirm("Are you sure you want to log out?")) return;
     localStorage.removeItem("token");
     toast.success("Logged out successfully");
     navigate("/login");

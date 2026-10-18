@@ -10,6 +10,10 @@ import type { Post } from "../Types/types";
 
 const LIMIT = 40;
 
+// Image-only posts: if the server refuses an empty body, we retry once with
+// this marker (PostCard hides it when showing the post).
+const BLANK = "📷";
+
 type Tab = "all" | "following";
 
 const card = "rounded-2xl border border-indigo-500/10 bg-[#0d0f2b]";
@@ -143,15 +147,27 @@ export default function Home() {
     return () => io.disconnect();
   }, [hasMore, loading, loadMore, posts.length]);
 
+  // Text, photo, or both. A photo alone is enough.
   async function handleCreatePost(e: React.FormEvent) {
     e.preventDefault();
     if (!content.trim() && !image) return;
     setSubmitting(true);
-    try {
+
+    const send = async (text: string) => {
       const fd = new FormData();
-      fd.append("body", content);
+      if (text) fd.append("body", text);
       if (image) fd.append("image", image);
       await api.post(endpoints.posts, fd);
+    };
+
+    try {
+      try {
+        await send(content.trim());
+      } catch (err) {
+        // Photo only and the server wants some text: retry with the marker
+        if (image && !content.trim()) await send(BLANK);
+        else throw err;
+      }
       setContent("");
       setImage(null);
       toast.success("Posted");
@@ -166,7 +182,8 @@ export default function Home() {
   const firstName = me?.name?.split(" ")[0];
 
   return (
-<div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">      {/* ---------- Center: composer + feed ---------- */}
+    <div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">
+      {/* ---------- Center: composer + feed ---------- */}
       <div className="min-w-0 space-y-4 sm:space-y-5">
         {/* Composer */}
         <form

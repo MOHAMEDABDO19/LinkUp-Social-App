@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
   Bookmark,
   Check,
   Heart,
+  ImagePlus,
   Loader2,
   MessageCircle,
   MoreHorizontal,
@@ -60,20 +61,138 @@ function useOutsideClose(open: boolean, close: () => void) {
   }, [open, close]);
   return ref;
 }
+// Some backends refuse a comment with no text, so an image-only comment
+// sends an invisible character, and we hide it when showing the comment.
+// Image-only posts/comments send this marker; we hide it when showing them.
+const BLANK = "📷";
+const cleanText = (s?: string) => {
+  const t = (s ?? "").trim();
+  return t === BLANK ? "" : t;
+};
+/* ---------------- Input box: text, and optionally an image ---------------- */
+function CommentBox({
+  placeholder,
+  onSubmit,
+  small,
+  allowImage = true,
+}: {
+  placeholder: string;
+  // return true when it worked, so the box clears itself
+  onSubmit: (text: string, file: File | null) => Promise<boolean>;
+  small?: boolean;
+  allowImage?: boolean;
+}) {
+  const [text, setText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-/* ---------------- Comment (with replies) ---------------- */
+  useEffect(() => {
+    if (!file) {
+      setPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  function pick(e: ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      toast.error("Please choose an image");
+      return;
+    }
+    setFile(f);
+  }
+
+  // Text OR image is enough, you don't have to write anything with a photo
+  async function submit() {
+    if (sending || (!text.trim() && !file)) return;
+    setSending(true);
+    const ok = await onSubmit(text, file);
+    setSending(false);
+    if (ok) {
+      setText("");
+      setFile(null);
+    }
+  }
+
+  const btn = small ? "h-9 w-9" : "h-10 w-10";
+
+  return (
+    <div className="space-y-2">
+      {preview && (
+        <div className="relative inline-block">
+          <img src={preview} alt="Selected" className="max-h-32 rounded-xl object-cover" />
+          <button
+            type="button"
+            onClick={() => setFile(null)}
+            aria-label="Remove image"
+            className="absolute -right-2 -top-2 rounded-full bg-slate-800 p-1 text-white shadow hover:bg-red-500"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        {allowImage && (
+          <>
+            <input ref={fileRef} type="file" accept="image/*" onChange={pick} className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              aria-label="Add image"
+              className={`flex ${btn} shrink-0 items-center justify-center rounded-full text-slate-400 hover:bg-white/5 hover:text-indigo-400`}
+            >
+              <ImagePlus className="h-5 w-5" />
+            </button>
+          </>
+        )}
+
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && void submit()}
+          placeholder={placeholder}
+          className={`min-w-0 flex-1 rounded-full border border-indigo-400/15 bg-[#15173f] text-base text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none ${
+            small ? "px-3.5 py-2" : "px-4 py-2.5"
+          }`}
+        />
+
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={sending || (!text.trim() && !file)}
+          aria-label="Send"
+          className={`flex ${btn} shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50`}
+        >
+          {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- Comment, or a reply (isReply = no further replies) ---------------- */
 function CommentItem({
   comment,
   postId,
   meId,
   onEdited,
   onRemoved,
+  isReply = false,
 }: {
   comment: Comment;
   postId: string;
   meId: string | null;
   onEdited: () => void;
   onRemoved: () => void;
+  isReply?: boolean;
 }) {
   const creator = comment.commentCreator ?? comment.user;
   const mine = !!meId && creator?._id === meId;
@@ -88,13 +207,11 @@ function CommentItem({
   );
   const [likes, setLikes] = useState(comment.likesCount ?? comment.likes?.length ?? 0);
 
-  // Replies: loaded when you tap "Reply"
+  // Replies exist only under a comment, not under a reply
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<Comment[]>(comment.replies ?? []);
   const [replyCount, setReplyCount] = useState(comment.repliesCount ?? comment.replies?.length ?? 0);
   const [loadingReplies, setLoadingReplies] = useState(false);
-  const [replyText, setReplyText] = useState("");
-  const [sendingReply, setSendingReply] = useState(false);
 
   async function toggleLike() {
     const next = !liked;
@@ -126,7 +243,7 @@ function CommentItem({
   }
 
   async function remove() {
-    if (!window.confirm("Delete this comment?")) return;
+    if (!window.confirm(isReply ? "Delete this reply?" : "Delete this comment?")) return;
     try {
       await api.delete(endpoints.comment(postId, comment._id));
       onRemoved();
@@ -157,27 +274,25 @@ function CommentItem({
     if (next) void loadReplies();
   }
 
-  // POST /posts/:postId/comments/:commentId/replies
-  async function sendReply() {
-    if (!replyText.trim()) return;
-    setSendingReply(true);
+  // POST /posts/:postId/comments/:commentId/replies  (text only)
+  async function sendReply(text: string) {
+    if (!text.trim()) return false;
     try {
       const fd = new FormData();
-      fd.append("content", replyText);
+      fd.append("content", text);
       await api.post(endpoints.replies(postId, comment._id), fd);
-      setReplyText("");
       await loadReplies();
+      return true;
     } catch (e) {
       toast.error(errMsg(e));
-    } finally {
-      setSendingReply(false);
+      return false;
     }
   }
 
   return (
     <div className="flex items-start gap-2.5">
       <ProfileLink user={creator} className="mt-0.5 shrink-0">
-        <Avatar user={creator} className="h-8 w-8" />
+        <Avatar user={creator} className={isReply ? "h-7 w-7" : "h-8 w-8"} />
       </ProfileLink>
       <div className="min-w-0 flex-1">
         <div className="rounded-2xl rounded-tl-md bg-white/5 px-3.5 py-2.5">
@@ -199,7 +314,7 @@ function CommentItem({
               <button
                 onClick={() => void save()}
                 disabled={busy}
-                aria-label="Save comment"
+                aria-label="Save"
                 className="rounded-lg bg-indigo-500 p-2 text-white disabled:opacity-50"
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
@@ -225,7 +340,7 @@ function CommentItem({
               {comment.image && (
                 <img
                   src={comment.image}
-                  alt="Comment attachment"
+                  alt="Attachment"
                   loading="lazy"
                   className="mt-2 max-h-60 rounded-xl object-cover"
                 />
@@ -244,13 +359,18 @@ function CommentItem({
             <Heart className={`h-3.5 w-3.5 ${liked ? "fill-rose-500" : ""}`} />
             {likes > 0 && likes}
           </button>
-          <button
-            onClick={toggleReplies}
-            aria-expanded={showReplies}
-            className={`font-semibold ${showReplies ? "text-indigo-400" : "hover:text-indigo-400"}`}
-          >
-            Reply{replyCount > 0 ? ` (${replyCount})` : ""}
-          </button>
+
+          {/* Reply button: comments only */}
+          {!isReply && (
+            <button
+              onClick={toggleReplies}
+              aria-expanded={showReplies}
+              className={`font-semibold ${showReplies ? "text-indigo-400" : "hover:text-indigo-400"}`}
+            >
+              Reply{replyCount > 0 ? ` (${replyCount})` : ""}
+            </button>
+          )}
+
           {mine && !editing && (
             <>
               <button onClick={() => setEditing(true)} className="font-semibold hover:text-indigo-400">
@@ -263,7 +383,7 @@ function CommentItem({
           )}
         </div>
 
-        {showReplies && (
+        {!isReply && showReplies && (
           <div className="mt-2 space-y-2.5 border-l border-white/10 pl-3">
             {loadingReplies && replies.length === 0 && (
               <div className="flex py-1 text-slate-500">
@@ -271,47 +391,27 @@ function CommentItem({
               </div>
             )}
 
-            {replies.map((r) => {
-              const who = r.commentCreator ?? r.user;
-              return (
-                <div key={r._id} className="flex items-start gap-2">
-                  <ProfileLink user={who} className="mt-0.5 shrink-0">
-                    <Avatar user={who} className="h-7 w-7" />
-                  </ProfileLink>
-                  <div className="min-w-0">
-                    <div className="rounded-2xl rounded-tl-md bg-white/5 px-3 py-2">
-                      <ProfileLink user={who} className="text-xs font-bold text-white hover:underline">
-                        {who?.name}
-                      </ProfileLink>
-                      {r.content && (
-                        <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-200">
-                          {r.content}
-                        </p>
-                      )}
-                    </div>
-                    <p className="mt-0.5 px-2 text-[11px] text-slate-500">{timeAgo(r.createdAt)}</p>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="flex items-center gap-2">
-              <input
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void sendReply()}
-                placeholder={`Reply to ${creator?.name?.split(" ")[0] ?? "this comment"}...`}
-                className="min-w-0 flex-1 rounded-full border border-indigo-400/15 bg-[#15173f] px-3.5 py-2 text-base text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none"
+            {replies.map((r) => (
+              <CommentItem
+                key={r._id}
+                comment={r}
+                postId={postId}
+                meId={meId}
+                isReply
+                onEdited={() => void loadReplies()}
+                onRemoved={() => {
+                  setReplyCount((n) => Math.max(0, n - 1));
+                  void loadReplies();
+                }}
               />
-              <button
-                onClick={() => void sendReply()}
-                disabled={sendingReply || !replyText.trim()}
-                aria-label="Send reply"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50"
-              >
-                {sendingReply ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              </button>
-            </div>
+            ))}
+
+            <CommentBox
+              small
+              allowImage={false}
+              placeholder={`Reply to ${creator?.name?.split(" ")[0] ?? "this comment"}...`}
+              onSubmit={(text) => sendReply(text)}
+            />
           </div>
         )}
       </div>
@@ -375,8 +475,6 @@ export default function PostCard({
   const [commentsPage, setCommentsPage] = useState(1);
   const [hasMoreComments, setHasMoreComments] = useState(false);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [sending, setSending] = useState(false);
 
   const loadComments = useCallback(
     async (page = 1) => {
@@ -487,21 +585,20 @@ export default function PostCard({
     }
   }
 
-  async function addComment() {
-    if (!commentText.trim()) return;
-    setSending(true);
+  // New top-level comment: text, image, or both
+  async function addComment(text: string, file: File | null) {
     try {
       const fd = new FormData();
-      fd.append("content", commentText);
+      if (text.trim()) fd.append("content", text);
+      if (file) fd.append("image", file);
       await api.post(endpoints.comments(post._id), fd);
-      setCommentText("");
       setCommentCount((c) => c + 1);
       setShowComments(true);
       await loadComments(1);
+      return true;
     } catch (e) {
       toast.error(errMsg(e));
-    } finally {
-      setSending(false);
+      return false;
     }
   }
 
@@ -794,22 +891,8 @@ export default function PostCard({
             <p className="text-sm text-slate-500">No comments yet. Start the conversation.</p>
           )}
 
-          <div className="flex items-center gap-2 pt-1">
-            <input
-              value={commentText}
-              onChange={(e) => setCommentText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void addComment()}
-              placeholder="Write a comment..."
-              className="min-w-0 flex-1 rounded-full border border-indigo-400/15 bg-[#15173f] px-4 py-2.5 text-base text-slate-100 placeholder:text-slate-400 focus:border-indigo-400 focus:outline-none"
-            />
-            <button
-              onClick={() => void addComment()}
-              disabled={sending || !commentText.trim()}
-              aria-label="Send comment"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-indigo-500 text-white hover:bg-indigo-400 disabled:opacity-50"
-            >
-              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </button>
+          <div className="pt-1">
+            <CommentBox placeholder="Write a comment..." onSubmit={addComment} />
           </div>
         </div>
       )}

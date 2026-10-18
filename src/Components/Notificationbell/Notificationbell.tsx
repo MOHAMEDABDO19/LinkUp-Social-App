@@ -1,84 +1,58 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
-import { api, endpoints, errMsg, extractList } from "../../../Api";
+import { api, endpoints, errMsg, extractList, nextPageOf } from "../../../Api";
 import { useMe } from "../../Useme";
 import Avatar from "../Avatar/avatar";
 import ProfileLink from "../../Components/LinkProfile/LinkProfile";
+import { describe, linkFor, timeAgo, unavailable } from "../../Notificationutils";
 import type { AppNotification } from "../../Pages/Types/types";
 
-type NotificationWithDetails = AppNotification & {
-  type?: string;
-  message?: string;
-  post?: { _id?: string; id?: string } | null;
-  postId?: string;
-};
+const LIMIT = 10;
+type Tab = "all" | "read";
 
-function describe(notification: AppNotification): string {
-  const item = notification as NotificationWithDetails;
-  if (item.message) return item.message;
-
-  switch (item.type?.toLowerCase()) {
-    case "like":
-    case "post_like":
-      return "liked your post.";
-    case "comment":
-    case "post_comment":
-      return "commented on your post.";
-    case "follow":
-      return "started following you.";
-    case "mention":
-      return "mentioned you.";
-    default:
-      return "sent you a notification.";
-  }
-}
-
-function linkFor(notification: AppNotification): string | undefined {
-  const item = notification as NotificationWithDetails;
-  const postId = item.post?._id ?? item.post?.id ?? item.postId;
-  return postId ? `/posts/${postId}` : undefined;
-}
-
-function timeAgo(value: string): string {
-  const timestamp = new Date(value).getTime();
-  if (!Number.isFinite(timestamp)) return "";
-
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return new Date(timestamp).toLocaleDateString();
-}
-
-function unavailable(notification: AppNotification): boolean {
-  const item = notification as NotificationWithDetails;
-  return Boolean(item.postId && !item.post);
-}
-
-// The bell for the top navbar: red badge with the unread number,
-// and a dropdown with the latest notifications.
 export default function NotificationBell() {
   const navigate = useNavigate();
   const { unread, refreshUnread } = useMe();
 
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("all");
   const [items, setItems] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [failed, setFailed] = useState(false);
   const [marking, setMarking] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const nextPageRef = useRef<number | null>(null);
 
-  // GET /notifications?unread=false&page=1&limit=10
-  const load = useCallback(async () => {
+  // In the Read tab we filter on the client and keep fetching until we find something
+  const fetchPage = useCallback(
+    async (page: number) => {
+      let current: number | null = page;
+      while (current !== null) {
+        const res = await api.get(endpoints.notifications, {
+          params: { page: current, limit: LIMIT },
+        });
+        const raw = extractList<AppNotification>(res.data, "notifications");
+        const next = nextPageOf(res.data, current, raw.length, LIMIT);
+        const list = tab === "read" ? raw.filter((n) => n.isRead) : raw;
+        if (list.length > 0 || next === null) return { list, nextPage: next };
+        current = next;
+      }
+      return { list: [] as AppNotification[], nextPage: null };
+    },
+    [tab],
+  );
+
+  const loadFirst = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get(endpoints.notifications, {
-        params: { unread: false, page: 1, limit: 10 },
-      });
-      setItems(extractList<AppNotification>(res.data, "notifications"));
+      const { list, nextPage } = await fetchPage(1);
+      setItems(list);
+      nextPageRef.current = nextPage;
+      setHasMore(nextPage !== null);
       setFailed(false);
     } catch (e) {
       setFailed(true);
@@ -86,13 +60,37 @@ export default function NotificationBell() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchPage]);
 
-  // Refresh when it opens, close on outside click / Escape
+  async function loadMore() {
+    const page = nextPageRef.current;
+    if (page === null || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const { list, nextPage } = await fetchPage(page);
+      setItems((prev) => {
+        const seen = new Set(prev.map((n) => n._id));
+        return [...prev, ...list.filter((n) => !seen.has(n._id))];
+      });
+      nextPageRef.current = nextPage;
+      setHasMore(nextPage !== null);
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  // Load when the dropdown opens or the tab changes
   useEffect(() => {
     if (!open) return;
-    void load();
+    void loadFirst();
     void refreshUnread();
+  }, [open, loadFirst, refreshUnread]);
+
+  // Close on outside click / Escape
+  useEffect(() => {
+    if (!open) return;
     const onDown = (e: MouseEvent | TouchEvent) => {
       if (boxRef.current && !boxRef.current.contains(e.target as Node))
         setOpen(false);
@@ -108,9 +106,8 @@ export default function NotificationBell() {
       document.removeEventListener("touchstart", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, load, refreshUnread]);
+  }, [open]);
 
-  // PATCH /notifications/:id/read
   async function markRead(n: AppNotification) {
     if (n.isRead) return;
     setItems((list) =>
@@ -127,7 +124,6 @@ export default function NotificationBell() {
     }
   }
 
-  // PATCH /notifications/read-all
   async function markAll() {
     setMarking(true);
     try {
@@ -141,26 +137,30 @@ export default function NotificationBell() {
     }
   }
 
-  function openItem(n: AppNotification) {
-    void markRead(n);
-    const to = linkFor(n);
-    setOpen(false);
-    if (to) navigate(to);
+  // Click a notification: go to the post, or say it's not available
+ // Click a notification: go to the post, or say it's not available
+function openItem(n: AppNotification) {
+  void markRead(n);
+  setOpen(false);
+
+  if (unavailable(n)) {
+    toast.error("This post is no longer available");
+    return;
   }
 
+  const to = linkFor(n);
+  if (to) navigate(to);
+  else toast.error("This content is not available");
+}
   return (
     <div className="relative" ref={boxRef}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={
-          unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
-        }
+        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
         aria-expanded={open}
         className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-          open
-            ? "bg-white/5 text-indigo-400"
-            : "text-slate-300 hover:text-white"
+          open ? "bg-white/5 text-indigo-400" : "text-slate-300 hover:text-white"
         }`}
       >
         <Bell className="h-5 w-5" />
@@ -190,8 +190,28 @@ export default function NotificationBell() {
             </button>
           </div>
 
+          {/* All / Read */}
+          <div className="flex gap-1 border-b border-white/10 p-2" role="tablist">
+            {(["all", "read"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={tab === t}
+                onClick={() => setTab(t)}
+                className={`flex-1 rounded-lg py-1.5 text-sm font-semibold transition-colors ${
+                  tab === t
+                    ? "bg-indigo-500 text-white"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {t === "all" ? "All" : "Read"}
+              </button>
+            ))}
+          </div>
+
           <div className="max-h-[60vh] overflow-y-auto">
-            {loading && items.length === 0 && (
+            {loading && (
               <div className="flex justify-center py-8 text-slate-500">
                 <Loader2 className="h-5 w-5 animate-spin" />
               </div>
@@ -201,7 +221,7 @@ export default function NotificationBell() {
               <div className="py-8 text-center text-sm text-slate-400">
                 Couldn't load notifications.
                 <button
-                  onClick={() => void load()}
+                  onClick={() => void loadFirst()}
                   className="mt-2 block w-full text-indigo-400 hover:underline"
                 >
                   Try again
@@ -211,74 +231,80 @@ export default function NotificationBell() {
 
             {!loading && !failed && items.length === 0 && (
               <p className="py-8 text-center text-sm text-slate-400">
-                No notifications yet.
+                {tab === "read" ? "No read notifications yet." : "No notifications yet."}
               </p>
             )}
 
-            <ul>
-              {items.map((n) => {
-                const unreadItem = !n.isRead;
-                return (
-                  <li key={n._id}>
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openItem(n)}
-                      onKeyDown={(e) => e.key === "Enter" && openItem(n)}
-                      className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5 ${
-                        unreadItem ? "bg-indigo-500/10" : ""
-                      }`}
-                    >
-                      <ProfileLink
-                        user={n.actor}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpen(false);
-                        }}
+            {!loading && (
+              <ul>
+                {items.map((n) => {
+                  const unreadItem = !n.isRead;
+                  return (
+                    <li key={n._id}>
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => openItem(n)}
+                        onKeyDown={(e) => e.key === "Enter" && openItem(n)}
+                        className={`flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-white/5 ${
+                          unreadItem ? "bg-indigo-500/10" : ""
+                        }`}
                       >
-                        <Avatar user={n.actor} className="h-10 w-10" />
-                      </ProfileLink>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm text-slate-200">
-                          {n.actor?.name && (
-                            <ProfileLink
-                              user={n.actor}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpen(false);
-                              }}
-                              className="font-semibold text-white hover:underline"
-                            >
-                              {n.actor.name}{" "}
-                            </ProfileLink>
-                          )}
-                          {describe(n)}
-                        </p>
-                        <p className="mt-0.5 text-xs text-slate-500">
-                          {timeAgo(n.createdAt ?? "")}
-                          {unavailable(n) && " · Post no longer available"}
-                        </p>
+                        <ProfileLink
+                          user={n.actor}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpen(false);
+                          }}
+                        >
+                          <Avatar user={n.actor} className="h-10 w-10" />
+                        </ProfileLink>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-slate-200">
+                            {n.actor?.name && (
+                              <ProfileLink
+                                user={n.actor}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setOpen(false);
+                                }}
+                                className="font-semibold text-white hover:underline"
+                              >
+                                {n.actor.name}{" "}
+                              </ProfileLink>
+                            )}
+                            {describe(n)}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {timeAgo(n.createdAt)}
+                            {unavailable(n) && " · Post no longer available"}
+                          </p>
+                        </div>
+                        {unreadItem && (
+                          <span
+                            aria-label="Unread"
+                            className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"
+                          />
+                        )}
                       </div>
-                      {unreadItem && (
-                        <span
-                          aria-label="Unread"
-                          className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"
-                        />
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
 
-          <Link
-            to="/notifications"
-            onClick={() => setOpen(false)}
-            className="block border-t border-white/10 py-3 text-center text-sm font-semibold text-indigo-400 hover:bg-white/5"
-          >
-            See all notifications
-          </Link>
+            {!loading && hasMore && (
+              <button
+                type="button"
+                onClick={() => void loadMore()}
+                disabled={loadingMore}
+                className="flex w-full items-center justify-center gap-2 border-t border-white/10 py-3 text-sm font-semibold text-indigo-400 hover:bg-white/5 disabled:opacity-60"
+              >
+                {loadingMore && <Loader2 className="h-4 w-4 animate-spin" />}
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

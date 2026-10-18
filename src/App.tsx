@@ -6,8 +6,7 @@ import Home from "./Pages/Home/Home";
 import Profile from "./Pages/Profile/Profile";
 import PostPage from "./Pages/PostPage/PostPage";
 import Bookmarks from "./Components/BockMark/BockMark";
-import Notifications from "./Components/Notifications/Notifications";
-import Layout from "./Layout/Layout";
+ import Layout from "./Layout/Layout";
 
 // حماية الصفحات: لو مفيش توكن يروح للتسجيل
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -89,14 +88,7 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      {
-        path: "notifications",
-        element: (
-          <ProtectedRoute>
-            <Notifications />
-          </ProtectedRoute>
-        ),
-      },
+    
       // بروفايلي
       {
         path: "profile",
