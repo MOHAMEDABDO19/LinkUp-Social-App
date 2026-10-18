@@ -87,17 +87,7 @@ export default function Navbar({ isLoggedIn, collapsed }: Props) {
 
           {isLoggedIn ? (
             <>
-              {/* Saved posts */}
-              <NavLink
-                to="/bookmarks"
-                aria-label="Bookmarks"
-                title="Bookmarks"
-                className={({ isActive }) =>
-                  `${iconBtn} ${isActive ? "bg-white/5 text-indigo-400" : ""}`
-                }
-              >
-                <Bookmark className="h-5 w-5" />
-              </NavLink>
+            
 
               <NotificationBell />
 
