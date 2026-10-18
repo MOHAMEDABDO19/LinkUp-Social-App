@@ -4,10 +4,59 @@ import { toast } from "react-toastify";
 import { Bell, CheckCheck, Loader2 } from "lucide-react";
 import { api, endpoints, errMsg, extractList } from "../../../Api";
 import { useMe } from "../../Useme";
-import { describe, linkFor, timeAgo, unavailable } from "../../notificationUtils";
 import Avatar from "../Avatar/avatar";
 import ProfileLink from "../../Components/LinkProfile/LinkProfile";
 import type { AppNotification } from "../../Pages/Types/types";
+
+type NotificationWithDetails = AppNotification & {
+  type?: string;
+  message?: string;
+  post?: { _id?: string; id?: string } | null;
+  postId?: string;
+};
+
+function describe(notification: AppNotification): string {
+  const item = notification as NotificationWithDetails;
+  if (item.message) return item.message;
+
+  switch (item.type?.toLowerCase()) {
+    case "like":
+    case "post_like":
+      return "liked your post.";
+    case "comment":
+    case "post_comment":
+      return "commented on your post.";
+    case "follow":
+      return "started following you.";
+    case "mention":
+      return "mentioned you.";
+    default:
+      return "sent you a notification.";
+  }
+}
+
+function linkFor(notification: AppNotification): string | undefined {
+  const item = notification as NotificationWithDetails;
+  const postId = item.post?._id ?? item.post?.id ?? item.postId;
+  return postId ? `/posts/${postId}` : undefined;
+}
+
+function timeAgo(value: string): string {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "";
+
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function unavailable(notification: AppNotification): boolean {
+  const item = notification as NotificationWithDetails;
+  return Boolean(item.postId && !item.post);
+}
 
 // The bell for the top navbar: red badge with the unread number,
 // and a dropdown with the latest notifications.
@@ -45,7 +94,8 @@ export default function NotificationBell() {
     void load();
     void refreshUnread();
     const onDown = (e: MouseEvent | TouchEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      if (boxRef.current && !boxRef.current.contains(e.target as Node))
+        setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -63,12 +113,16 @@ export default function NotificationBell() {
   // PATCH /notifications/:id/read
   async function markRead(n: AppNotification) {
     if (n.isRead) return;
-    setItems((list) => list.map((x) => (x._id === n._id ? { ...x, isRead: true } : x)));
+    setItems((list) =>
+      list.map((x) => (x._id === n._id ? { ...x, isRead: true } : x)),
+    );
     try {
       await api.patch(endpoints.notificationRead(n._id));
       void refreshUnread();
     } catch (e) {
-      setItems((list) => list.map((x) => (x._id === n._id ? { ...x, isRead: false } : x)));
+      setItems((list) =>
+        list.map((x) => (x._id === n._id ? { ...x, isRead: false } : x)),
+      );
       toast.error(errMsg(e));
     }
   }
@@ -99,10 +153,14 @@ export default function NotificationBell() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
+        aria-label={
+          unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+        }
         aria-expanded={open}
         className={`relative flex h-10 w-10 items-center justify-center rounded-xl transition-colors hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
-          open ? "bg-white/5 text-indigo-400" : "text-slate-300 hover:text-white"
+          open
+            ? "bg-white/5 text-indigo-400"
+            : "text-slate-300 hover:text-white"
         }`}
       >
         <Bell className="h-5 w-5" />
@@ -123,7 +181,11 @@ export default function NotificationBell() {
               disabled={marking || unread === 0}
               className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-indigo-400 hover:bg-white/5 disabled:opacity-40"
             >
-              {marking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5" />}
+              {marking ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <CheckCheck className="h-3.5 w-3.5" />
+              )}
               Mark all as read
             </button>
           </div>
@@ -148,7 +210,9 @@ export default function NotificationBell() {
             )}
 
             {!loading && !failed && items.length === 0 && (
-              <p className="py-8 text-center text-sm text-slate-400">No notifications yet.</p>
+              <p className="py-8 text-center text-sm text-slate-400">
+                No notifications yet.
+              </p>
             )}
 
             <ul>
@@ -165,7 +229,13 @@ export default function NotificationBell() {
                         unreadItem ? "bg-indigo-500/10" : ""
                       }`}
                     >
-                      <ProfileLink user={n.actor} onClick={(e) => { e.stopPropagation(); setOpen(false); }}>
+                      <ProfileLink
+                        user={n.actor}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(false);
+                        }}
+                      >
                         <Avatar user={n.actor} className="h-10 w-10" />
                       </ProfileLink>
                       <div className="min-w-0 flex-1">
@@ -173,7 +243,10 @@ export default function NotificationBell() {
                           {n.actor?.name && (
                             <ProfileLink
                               user={n.actor}
-                              onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpen(false);
+                              }}
                               className="font-semibold text-white hover:underline"
                             >
                               {n.actor.name}{" "}
@@ -182,12 +255,15 @@ export default function NotificationBell() {
                           {describe(n)}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">
-                          {timeAgo(n.createdAt)}
+                          {timeAgo(n.createdAt ?? "")}
                           {unavailable(n) && " · Post no longer available"}
                         </p>
                       </div>
                       {unreadItem && (
-                        <span aria-label="Unread" className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400" />
+                        <span
+                          aria-label="Unread"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-400"
+                        />
                       )}
                     </div>
                   </li>
