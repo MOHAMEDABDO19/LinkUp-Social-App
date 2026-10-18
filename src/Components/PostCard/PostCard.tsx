@@ -25,6 +25,13 @@ import type { Comment, Post } from "../../Pages/Types/types";
 
 const COMMENTS_LIMIT = 10;
 
+// Image-only posts/comments send this marker; we hide it when showing them.
+const BLANK = "📷";
+const cleanText = (s?: string) => {
+  const t = (s ?? "").trim();
+  return t === BLANK ? "" : t;
+};
+
 function timeAgo(date?: string) {
   if (!date) return "Recently";
   const s = Math.max(1, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
@@ -61,14 +68,7 @@ function useOutsideClose(open: boolean, close: () => void) {
   }, [open, close]);
   return ref;
 }
-// Some backends refuse a comment with no text, so an image-only comment
-// sends an invisible character, and we hide it when showing the comment.
-// Image-only posts/comments send this marker; we hide it when showing them.
-const BLANK = "📷";
-const cleanText = (s?: string) => {
-  const t = (s ?? "").trim();
-  return t === BLANK ? "" : t;
-};
+
 /* ---------------- Input box: text, and optionally an image ---------------- */
 function CommentBox({
   placeholder,
@@ -197,7 +197,7 @@ function CommentItem({
   const creator = comment.commentCreator ?? comment.user;
   const mine = !!meId && creator?._id === meId;
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(comment.content ?? "");
+  const [draft, setDraft] = useState(cleanText(comment.content));
   const [busy, setBusy] = useState(false);
 
   const [liked, setLiked] = useState(
@@ -322,7 +322,7 @@ function CommentItem({
               <button
                 onClick={() => {
                   setEditing(false);
-                  setDraft(comment.content ?? "");
+                  setDraft(cleanText(comment.content));
                 }}
                 aria-label="Cancel"
                 className="rounded-lg bg-slate-700 p-2 text-slate-200"
@@ -332,9 +332,9 @@ function CommentItem({
             </div>
           ) : (
             <>
-              {comment.content && (
+              {cleanText(comment.content) && (
                 <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-slate-200">
-                  {comment.content}
+                  {cleanText(comment.content)}
                 </p>
               )}
               {comment.image && (
@@ -442,7 +442,7 @@ export default function PostCard({
 }: Props) {
   const mine = !!meId && post.user?._id === meId;
 
-  const [body, setBody] = useState(post.body ?? "");
+  const [body, setBody] = useState(cleanText(post.body));
 
   const [liked, setLiked] = useState(
     !!meId &&
@@ -465,7 +465,7 @@ export default function PostCard({
   const shareRef = useOutsideClose(shareOpen, closeShare);
 
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(post.body ?? "");
+  const [draft, setDraft] = useState(cleanText(post.body));
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Comments live here, loaded from the comments endpoint
@@ -589,7 +589,7 @@ export default function PostCard({
   async function addComment(text: string, file: File | null) {
     try {
       const fd = new FormData();
-      if (text.trim()) fd.append("content", text);
+      fd.append("content", text.trim() ? text : BLANK);
       if (file) fd.append("image", file);
       await api.post(endpoints.comments(post._id), fd);
       setCommentCount((c) => c + 1);
@@ -732,9 +732,9 @@ export default function PostCard({
               <p className="text-xs text-slate-500">{timeAgo(post.sharedPost.createdAt)}</p>
             </div>
           </div>
-          {post.sharedPost.body && (
+          {cleanText(post.sharedPost.body) && (
             <p className="whitespace-pre-wrap break-words px-3 pb-3 text-sm text-slate-300">
-              {post.sharedPost.body}
+              {cleanText(post.sharedPost.body)}
             </p>
           )}
           {post.sharedPost.image && (
@@ -839,8 +839,10 @@ export default function PostCard({
             >
               {post.topComment.commentCreator?.name}
             </ProfileLink>
-            {post.topComment.content && (
-              <p className="mt-0.5 line-clamp-2 break-words text-sm text-slate-200">{post.topComment.content}</p>
+            {cleanText(post.topComment.content) && (
+              <p className="mt-0.5 line-clamp-2 break-words text-sm text-slate-200">
+                {cleanText(post.topComment.content)}
+              </p>
             )}
             {post.topComment.image && (
               <img
