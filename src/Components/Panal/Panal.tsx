@@ -1,11 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Flame,
-  UsersRound,
-  X,
-  ChevronRight,
-  UserPlus,
-} from "lucide-react";
+import { UsersRound, X, ChevronRight, UserPlus } from "lucide-react";
 
 import { api, endpoints, extractList } from "../../../Api";
 import { useMe } from "../../Useme";
@@ -13,8 +7,7 @@ import Avatar from "../Avatar/avatar";
 import ProfileLink from "../LinkProfile/LinkProfile";
 import type { User } from "../../Pages/Types/types";
 
-const card =
-  "rounded-2xl border border-indigo-500/10 bg-[#0d0f2b] p-5";
+const card = "rounded-2xl border border-indigo-500/10 bg-[#0d0f2b] p-5";
 
 type Props = {
   trending: { tag: string; count: number }[];
@@ -109,10 +102,8 @@ export default function RightPanel({ trending }: Props) {
   const people = suggestions.filter(
     (user) =>
       user._id !== meId &&
-      (
-        justFollowed.current.has(user._id) ||
-        !isFollowing(user._id, user.isFollowing)
-      ),
+      (justFollowed.current.has(user._id) ||
+        !isFollowing(user._id, user.isFollowing)),
   );
 
   const visible = showAll ? people : people.slice(0, 6);
@@ -125,8 +116,7 @@ export default function RightPanel({ trending }: Props) {
   // Latest friends
   const friends = (me?.following ?? [])
     .filter(
-      (friend): friend is User =>
-        typeof friend === "object" && !!friend?._id,
+      (friend): friend is User => typeof friend === "object" && !!friend?._id,
     )
     .slice(0, 5);
 
@@ -134,7 +124,27 @@ export default function RightPanel({ trending }: Props) {
     <>
       {/* Right sidebar: Trending and Latest Friends only */}
       <aside className="space-y-5 xl:sticky xl:top-24">
-     
+        {trending.length > 0 && (
+          <section className={card}>
+            <h2 className="mb-4 text-lg font-bold text-white">Trending</h2>
+
+            <ul className="space-y-3">
+              {trending.map(({ tag, count }) => (
+                <li
+                  key={tag}
+                  className="flex items-center justify-between gap-3"
+                >
+                  <span className="truncate font-medium text-indigo-300">
+                    #{tag.replace(/^#/, "")}
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {count} {count === 1 ? "post" : "posts"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
         {/* Latest Friends */}
         {friends.length > 0 && (
@@ -170,7 +180,8 @@ export default function RightPanel({ trending }: Props) {
         onClick={() => setIsOpen((open) => !open)}
         aria-label="Who to follow"
         aria-expanded={isOpen}
-        className="fixed bottom-24 right-4 z-[90] flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30 transition duration-300 hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14"      >
+        className="fixed bottom-24 right-4 z-[90] flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30 transition duration-300 hover:scale-110 active:scale-95 sm:bottom-6 sm:right-6 sm:h-14 sm:w-14"
+      >
         {isOpen ? (
           <X className="h-6 w-6" />
         ) : (
@@ -197,11 +208,11 @@ export default function RightPanel({ trending }: Props) {
         ref={panelRef}
         aria-label="Follow suggestions"
         aria-hidden={!isOpen}
-       className={`fixed bottom-0 right-0 z-[100] flex w-full flex-col overflow-hidden rounded-t-3xl border border-indigo-400/20 bg-[#0b0d24] shadow-2xl shadow-black/50 transition-all duration-300 sm:bottom-24 sm:right-6 sm:w-[390px] sm:rounded-2xl ${
-  isOpen
-    ? "visible translate-y-0 opacity-100"
-    : "invisible translate-y-8 opacity-0 pointer-events-none"
-}`}
+        className={`fixed bottom-0 right-0 z-[100] flex w-full flex-col overflow-hidden rounded-t-3xl border border-indigo-400/20 bg-[#0b0d24] shadow-2xl shadow-black/50 transition-all duration-300 sm:bottom-24 sm:right-6 sm:w-[390px] sm:rounded-2xl ${
+          isOpen
+            ? "visible translate-y-0 opacity-100"
+            : "invisible translate-y-8 opacity-0 pointer-events-none"
+        }`}
         style={{
           maxHeight: "min(75dvh, 620px)",
         }}
@@ -214,9 +225,7 @@ export default function RightPanel({ trending }: Props) {
             </div>
 
             <div>
-              <h2 className="text-base font-bold text-white">
-                Who to follow
-              </h2>
+              <h2 className="text-base font-bold text-white">Who to follow</h2>
 
               <p className="text-xs text-slate-400">
                 Discover people on LinkUp
@@ -271,24 +280,15 @@ export default function RightPanel({ trending }: Props) {
           ) : (
             <ul className="space-y-4">
               {visible.map((user) => {
-                const followed = isFollowing(
-                  user._id,
-                  user.isFollowing,
-                );
+                const followed = isFollowing(user._id, user.isFollowing);
 
                 return (
-                  <li
-                    key={user._id}
-                    className="flex items-center gap-3"
-                  >
+                  <li key={user._id} className="flex items-center gap-3">
                     <ProfileLink user={user} className="shrink-0">
                       <Avatar user={user} className="h-11 w-11" />
                     </ProfileLink>
 
-                    <ProfileLink
-                      user={user}
-                      className="min-w-0 flex-1"
-                    >
+                    <ProfileLink user={user} className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-white hover:underline">
                         {user.name}
                       </p>
