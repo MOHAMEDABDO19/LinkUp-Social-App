@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { Camera, Loader2, Moon, Settings, Sun, UserCheck, UserPlus, X } from "lucide-react";
+import {
+  Camera,
+  Loader2,
+  Moon,
+  Settings,
+  Sun,
+  UserCheck,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { api, endpoints, errMsg, extractList, nextPageOf } from "../../../Api";
 import { useMe } from "../../Useme";
-import { useTheme } from "../../Usetheam";
+import { useTheme } from "../../Usethem";
 import Avatar from "../../Components/Avatar/avatar";
 import ProfileLink from "../../Components/LinkProfile/LinkProfile";
 import Composer from "../../Components/Composer/Composer";
@@ -13,7 +22,8 @@ import type { Post, User } from "../Types/types";
 
 const LIMIT = 20;
 const card = "rounded-2xl border border-indigo-500/10 bg-[#0d0f2b]";
-const PASSWORD_RULE = /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,15}$/;
+const PASSWORD_RULE =
+  /^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,15}$/;
 
 const inputClass =
   "w-full min-h-11 rounded-xl border border-slate-700/70 bg-[#15173f] px-4 py-2.5 text-base text-white placeholder-slate-500 outline-none transition-all hover:border-slate-600 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30";
@@ -59,7 +69,9 @@ export default function Profile() {
   // ...and scrolls to it once the page has loaded
   useEffect(() => {
     if (showPassword && !loadingProfile && searchParams.get("settings")) {
-      document.getElementById("settings")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById("settings")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [showPassword, loadingProfile, searchParams]);
 
@@ -71,13 +83,16 @@ export default function Profile() {
   // Opens the picture in full size (works on anyone's profile)
   useEffect(() => {
     if (!photoOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPhotoOpen(false);
+    const onKey = (e: KeyboardEvent) =>
+      e.key === "Escape" && setPhotoOpen(false);
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [photoOpen]);
 
   // Followers / Following list (opens when you tap the number)
-  const [listKind, setListKind] = useState<"followers" | "following" | null>(null);
+  const [listKind, setListKind] = useState<"followers" | "following" | null>(
+    null,
+  );
   const [listPeople, setListPeople] = useState<User[]>([]);
   const [listLoading, setListLoading] = useState(false);
 
@@ -88,7 +103,8 @@ export default function Profile() {
     setListKind(kind);
     setListPeople([]);
     setListLoading(true);
-    const entries = (kind === "followers" ? profile.followers : profile.following) ?? [];
+    const entries =
+      (kind === "followers" ? profile.followers : profile.following) ?? [];
     const people: User[] = [];
     const ids: string[] = [];
     for (const e of entries) {
@@ -242,14 +258,18 @@ export default function Profile() {
 
   if (!profile) {
     return (
-      <div className={`${card} mx-auto max-w-2xl py-12 text-center text-slate-400`}>
+      <div
+        className={`${card} mx-auto max-w-2xl py-12 text-center text-slate-400`}
+      >
         Couldn't load this profile.
       </div>
     );
   }
 
-  const followers = (profile.followersCount ?? profile.followers?.length ?? 0) + followerDelta;
-  const followingCount = profile.followingCount ?? profile.following?.length ?? 0;
+  const followers =
+    (profile.followersCount ?? profile.followers?.length ?? 0) + followerDelta;
+  const followingCount =
+    profile.followingCount ?? profile.following?.length ?? 0;
   const postsCount = profile.postsCount ?? posts.length;
   const followed = isFollowing(profile._id, profile.isFollowing);
 
@@ -268,7 +288,10 @@ export default function Profile() {
                 aria-label="View photo"
                 className={`block rounded-full ${profile.photo ? "cursor-zoom-in" : "cursor-default"}`}
               >
-                <Avatar user={profile} className="h-24 w-24 text-3xl sm:h-28 sm:w-28" />
+                <Avatar
+                  user={profile}
+                  className="h-24 w-24 text-3xl sm:h-28 sm:w-28"
+                />
               </button>
               {own && (
                 <>
@@ -278,7 +301,11 @@ export default function Profile() {
                     aria-label="Change profile photo"
                     className="absolute bottom-1 right-1 flex h-9 w-9 items-center justify-center rounded-full bg-indigo-500 text-white shadow-lg ring-2 ring-[#0d0f2b] transition-colors hover:bg-indigo-400 disabled:opacity-60"
                   >
-                    {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    {uploading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Camera className="h-4 w-4" />
+                    )}
                   </button>
                   <input
                     ref={fileRef}
@@ -296,7 +323,9 @@ export default function Profile() {
 
             {own ? (
               <button
-                onClick={() => (showPassword ? closeSettings() : setShowPassword(true))}
+                onClick={() =>
+                  showPassword ? closeSettings() : setShowPassword(true)
+                }
                 aria-label="Settings"
                 aria-expanded={showPassword}
                 className="flex min-h-10 items-center gap-2 rounded-xl border border-white/10 px-4 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/5"
@@ -313,20 +342,32 @@ export default function Profile() {
                     : "bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 hover:bg-indigo-400"
                 }`}
               >
-                {followed ? <UserCheck className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                {followed ? (
+                  <UserCheck className="h-4 w-4" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
                 {followed ? "Following" : "Follow"}
               </button>
             )}
           </div>
 
           <h1 className="mt-3 text-2xl font-bold text-white">{profile.name}</h1>
-          {profile.username && <p className="text-sm text-slate-400">@{profile.username}</p>}
-          {own && profile.email && <p className="mt-1 text-sm text-slate-500">{profile.email}</p>}
-          {profile.bio && <p className="mt-3 text-sm text-slate-300">{profile.bio}</p>}
+          {profile.username && (
+            <p className="text-sm text-slate-400">@{profile.username}</p>
+          )}
+          {own && profile.email && (
+            <p className="mt-1 text-sm text-slate-500">{profile.email}</p>
+          )}
+          {profile.bio && (
+            <p className="mt-3 text-sm text-slate-300">{profile.bio}</p>
+          )}
 
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-white/5 pt-4 text-center">
             <div>
-              <p className="text-xl font-bold text-white">{postsCount.toLocaleString()}</p>
+              <p className="text-xl font-bold text-white">
+                {postsCount.toLocaleString()}
+              </p>
               <p className="text-xs text-slate-400">Posts</p>
             </div>
             <button
@@ -334,7 +375,9 @@ export default function Profile() {
               onClick={() => void openList("followers")}
               className="rounded-xl py-1 transition-colors hover:bg-white/5"
             >
-              <p className="text-xl font-bold text-white">{Math.max(0, followers).toLocaleString()}</p>
+              <p className="text-xl font-bold text-white">
+                {Math.max(0, followers).toLocaleString()}
+              </p>
               <p className="text-xs text-slate-400">Followers</p>
             </button>
             <button
@@ -342,7 +385,9 @@ export default function Profile() {
               onClick={() => void openList("following")}
               className="rounded-xl py-1 transition-colors hover:bg-white/5"
             >
-              <p className="text-xl font-bold text-white">{followingCount.toLocaleString()}</p>
+              <p className="text-xl font-bold text-white">
+                {followingCount.toLocaleString()}
+              </p>
               <p className="text-xs text-slate-400">Following</p>
             </button>
           </div>
@@ -367,7 +412,9 @@ export default function Profile() {
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-300">Appearance</h3>
+            <h3 className="mb-2 text-sm font-semibold text-slate-300">
+              Appearance
+            </h3>
             <div className="flex gap-2">
               {(["dark", "light"] as const).map((t) => (
                 <button
@@ -381,49 +428,55 @@ export default function Profile() {
                       : "border-white/10 text-slate-300 hover:bg-white/5"
                   }`}
                 >
-                  {t === "dark" ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  {t === "dark" ? (
+                    <Moon className="h-4 w-4" />
+                  ) : (
+                    <Sun className="h-4 w-4" />
+                  )}
                   {t === "dark" ? "Dark" : "Light"}
                 </button>
               ))}
             </div>
           </div>
 
-        <form onSubmit={(e) => void changePassword(e)} className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-300">Change password</h3>
-          <input
-            type="password"
-            autoComplete="current-password"
-            placeholder="Current password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            className={inputClass}
-          />
-          <input
-            type="password"
-            autoComplete="new-password"
-            placeholder="New password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className={inputClass}
-          />
-          <div className="flex justify-end gap-2 pt-1">
-            <button
-              type="button"
-              onClick={closeSettings}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={savingPassword}
-              className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
-            >
-              {savingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
-              Save
-            </button>
-          </div>
-        </form>
+          <form onSubmit={(e) => void changePassword(e)} className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-300">
+              Change password
+            </h3>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="Current password"
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+              className={inputClass}
+            />
+            <input
+              type="password"
+              autoComplete="new-password"
+              placeholder="New password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className={inputClass}
+            />
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={closeSettings}
+                className="rounded-xl border border-white/10 px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingPassword}
+                className="flex items-center gap-2 rounded-xl bg-indigo-500 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-400 disabled:opacity-60"
+              >
+                {savingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                Save
+              </button>
+            </div>
+          </form>
         </section>
       )}
 
@@ -476,16 +529,32 @@ export default function Profile() {
                   const f = isFollowing(p._id, p.isFollowing);
                   return (
                     <li key={p._id} className="flex items-center gap-3">
-                      <ProfileLink user={p} onClick={() => setListKind(null)} className="shrink-0">
+                      <ProfileLink
+                        user={p}
+                        onClick={() => setListKind(null)}
+                        className="shrink-0"
+                      >
                         <Avatar user={p} className="h-11 w-11" />
                       </ProfileLink>
-                      <ProfileLink user={p} onClick={() => setListKind(null)} className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-white hover:underline">{p.name}</p>
-                        {p.username && <p className="truncate text-xs text-slate-400">@{p.username}</p>}
+                      <ProfileLink
+                        user={p}
+                        onClick={() => setListKind(null)}
+                        className="min-w-0 flex-1"
+                      >
+                        <p className="truncate text-sm font-semibold text-white hover:underline">
+                          {p.name}
+                        </p>
+                        {p.username && (
+                          <p className="truncate text-xs text-slate-400">
+                            @{p.username}
+                          </p>
+                        )}
                       </ProfileLink>
                       {!isMe && (
                         <button
-                          onClick={() => void toggleFollow(p._id, p.isFollowing)}
+                          onClick={() =>
+                            void toggleFollow(p._id, p.isFollowing)
+                          }
                           className={`min-h-9 shrink-0 rounded-lg px-4 text-sm font-semibold transition-colors ${
                             f
                               ? "border border-white/10 text-slate-300 hover:bg-white/5"
@@ -534,7 +603,9 @@ export default function Profile() {
       <h2 className="px-1 text-lg font-bold text-white">Posts</h2>
 
       {loadingPosts &&
-        [1, 2].map((n) => <div key={n} className={`${card} h-60 animate-pulse`} />)}
+        [1, 2].map((n) => (
+          <div key={n} className={`${card} h-60 animate-pulse`} />
+        ))}
 
       {!loadingPosts && posts.length === 0 && (
         <div className={`${card} py-12 text-center text-slate-400`}>
@@ -551,7 +622,9 @@ export default function Profile() {
             following={isFollowing(post.user?._id, post.user?.isFollowing)}
             onFollow={(id) => void toggleFollow(id, post.user?.isFollowing)}
             onReposted={() => void loadPosts()}
-            onDeleted={(id) => setPosts((list) => list.filter((p) => p._id !== id))}
+            onDeleted={(id) =>
+              setPosts((list) => list.filter((p) => p._id !== id))
+            }
           />
         ))}
 

@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { Bookmark, ChevronDown, LogOut, Moon, Sun, User } from "lucide-react";
 import { useMe } from "../../Useme";
-import { useTheme } from "../../Usetheam";
+import { useTheme } from "../../Usethem";
 import Avatar from "../Avatar/avatar";
 import { BrandName, LogoMark } from "../Avatar/logo";
 import NotificationBell from "../Notificationbell/Notificationbell";
@@ -28,7 +28,8 @@ export default function Navbar({ isLoggedIn, collapsed }: Props) {
   useEffect(() => {
     if (!menuOpen) return;
     const onDown = (e: MouseEvent | TouchEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+      if (menuRef.current && !menuRef.current.contains(e.target as Node))
+        setMenuOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMenuOpen(false);
@@ -129,21 +130,37 @@ export default function Navbar({ isLoggedIn, collapsed }: Props) {
                     <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
                       <Avatar user={me} className="h-10 w-10" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{me?.name ?? "..."}</p>
+                        <p className="truncate text-sm font-semibold text-white">
+                          {me?.name ?? "..."}
+                        </p>
                         {me?.username && (
-                          <p className="truncate text-xs text-slate-400">@{me.username}</p>
+                          <p className="truncate text-xs text-slate-400">
+                            @{me.username}
+                          </p>
                         )}
                       </div>
                     </div>
 
-                    <Link to="/profile" onClick={() => setMenuOpen(false)} className={menuItem}>
+                    <Link
+                      to="/profile"
+                      onClick={() => setMenuOpen(false)}
+                      className={menuItem}
+                    >
                       <User className="h-4 w-4" /> My profile
                     </Link>
-                    <Link to="/bookmarks" onClick={() => setMenuOpen(false)} className={menuItem}>
+                    <Link
+                      to="/bookmarks"
+                      onClick={() => setMenuOpen(false)}
+                      className={menuItem}
+                    >
                       <Bookmark className="h-4 w-4" /> Bookmarks
                     </Link>
                     <button type="button" onClick={toggle} className={menuItem}>
-                      {light ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                      {light ? (
+                        <Moon className="h-4 w-4" />
+                      ) : (
+                        <Sun className="h-4 w-4" />
+                      )}
                       {light ? "Dark mode" : "Light mode"}
                     </button>
                     <button

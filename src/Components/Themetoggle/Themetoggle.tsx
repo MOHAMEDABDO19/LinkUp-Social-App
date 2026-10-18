@@ -1,8 +1,12 @@
 import { Moon, Sun } from "lucide-react";
-import { useTheme } from "../.././/Usetheam";
+import { useTheme } from "../../Usethem";
 
 // Round sun / moon button for the navbar
-export default function ThemeToggle({ className = "" }: { className?: string }) {
+export default function ThemeToggle({
+  className = "",
+}: {
+  className?: string;
+}) {
   const { theme, toggle } = useTheme();
   const light = theme === "light";
   return (
