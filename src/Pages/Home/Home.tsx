@@ -166,8 +166,7 @@ export default function Home() {
   const firstName = me?.name?.split(" ")[0];
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-      {/* ---------- Center: composer + feed ---------- */}
+<div className="mx-auto w-full max-w-[1600px] px-3 sm:px-5 lg:px-8">      {/* ---------- Center: composer + feed ---------- */}
       <div className="min-w-0 space-y-4 sm:space-y-5">
         {/* Composer */}
         <form
@@ -313,7 +312,7 @@ export default function Home() {
       </div>
 
       {/* ---------- Right column (desktop only) ---------- */}
-      <div className="hidden xl:block">
+      <div className=" xl:block">
         <RightPanel trending={trending} />
       </div>
     </div>
