@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import "./theme.css";
+import "./assets/theme.css";
 
 export type Theme = "dark" | "light";
 
